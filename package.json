@@ -57,8 +57,7 @@
 		"build": "grunt concat",
 		"test": "grunt"
 	},
-	"dependencies": {},
-	"devDependencies": {
+	"dependencies": {
 		"grunt": "0.4.2",
 		"grunt-contrib-jshint": "0.7.1",
 		"grunt-contrib-uglify": "0.1.1",
