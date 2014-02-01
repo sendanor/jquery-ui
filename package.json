@@ -51,7 +51,10 @@
 			"url": "https://github.com/jquery/jquery-ui/blob/master/MIT-LICENSE.txt"
 		}
 	],
+	"main": "dist/jquery-ui.js",
 	"scripts": {
+		"install": "npm run build",
+		"build": "grunt concat",
 		"test": "grunt"
 	},
 	"dependencies": {},
