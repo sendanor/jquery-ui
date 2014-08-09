@@ -58,7 +58,6 @@
 	],
 	"main": "dist/jquery-ui.js",
 	"scripts": {
-		"install": "npm run build",
 		"build": "grunt concat",
 		"test": "grunt"
 	},
