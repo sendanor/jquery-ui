@@ -75,24 +75,7 @@ return $.widget( "ui.tabs", {
 
 		this.element
 			.addClass( "ui-tabs ui-widget ui-widget-content ui-corner-all" )
-			.toggleClass( "ui-tabs-collapsible", options.collapsible )
-			// Prevent users from focusing disabled tabs via click
-			.delegate( ".ui-tabs-nav > li", "mousedown" + this.eventNamespace, function( event ) {
-				if ( $( this ).is( ".ui-state-disabled" ) ) {
-					event.preventDefault();
-				}
-			})
-			// support: IE <9
-			// Preventing the default action in mousedown doesn't prevent IE
-			// from focusing the element, so if the anchor gets focused, blur.
-			// We don't have to worry about focusing the previously focused
-			// element since clicking on a non-focusable element should focus
-			// the body anyway.
-			.delegate( ".ui-tabs-anchor", "focus" + this.eventNamespace, function() {
-				if ( $( this ).closest( "li" ).is( ".ui-state-disabled" ) ) {
-					this.blur();
-				}
-			});
+			.toggleClass( "ui-tabs-collapsible", options.collapsible );
 
 		this._processTabs();
 		options.active = this._initialActive();
@@ -360,12 +343,12 @@ return $.widget( "ui.tabs", {
 
 		this.tabs.not( this.active ).attr({
 			"aria-selected": "false",
+			"aria-expanded": "false",
 			tabIndex: -1
 		});
 		this.panels.not( this._getPanelForTab( this.active ) )
 			.hide()
 			.attr({
-				"aria-expanded": "false",
 				"aria-hidden": "true"
 			});
 
@@ -377,12 +360,12 @@ return $.widget( "ui.tabs", {
 				.addClass( "ui-tabs-active ui-state-active" )
 				.attr({
 					"aria-selected": "true",
+					"aria-expanded": "true",
 					tabIndex: 0
 				});
 			this._getPanelForTab( this.active )
 				.show()
 				.attr({
-					"aria-expanded": "true",
 					"aria-hidden": "false"
 				});
 		}
@@ -393,7 +376,26 @@ return $.widget( "ui.tabs", {
 
 		this.tablist = this._getList()
 			.addClass( "ui-tabs-nav ui-helper-reset ui-helper-clearfix ui-widget-header ui-corner-all" )
-			.attr( "role", "tablist" );
+			.attr( "role", "tablist" )
+
+			// Prevent users from focusing disabled tabs via click
+			.delegate( "> li", "mousedown" + this.eventNamespace, function( event ) {
+				if ( $( this ).is( ".ui-state-disabled" ) ) {
+					event.preventDefault();
+				}
+			})
+
+			// support: IE <9
+			// Preventing the default action in mousedown doesn't prevent IE
+			// from focusing the element, so if the anchor gets focused, blur.
+			// We don't have to worry about focusing the previously focused
+			// element since clicking on a non-focusable element should focus
+			// the body anyway.
+			.delegate( ".ui-tabs-anchor", "focus" + this.eventNamespace, function() {
+				if ( $( this ).closest( "li" ).is( ".ui-state-disabled" ) ) {
+					this.blur();
+				}
+			});
 
 		this.tabs = this.tablist.find( "> li:has(a[href])" )
 			.addClass( "ui-state-default ui-corner-top" )
@@ -634,11 +636,11 @@ return $.widget( "ui.tabs", {
 			show();
 		}
 
-		toHide.attr({
-			"aria-expanded": "false",
-			"aria-hidden": "true"
+		toHide.attr( "aria-hidden", "true" );
+		eventData.oldTab.attr({
+			"aria-selected": "false",
+			"aria-expanded": "false"
 		});
-		eventData.oldTab.attr( "aria-selected", "false" );
 		// If we're switching tabs, remove the old tab from the tab order.
 		// If we're opening from collapsed state, remove the previous tab from the tab order.
 		// If we're collapsing, then keep the collapsing tab in the tab order.
@@ -651,12 +653,10 @@ return $.widget( "ui.tabs", {
 			.attr( "tabIndex", -1 );
 		}
 
-		toShow.attr({
-			"aria-expanded": "true",
-			"aria-hidden": "false"
-		});
+		toShow.attr( "aria-hidden", "false" );
 		eventData.newTab.attr({
 			"aria-selected": "true",
+			"aria-expanded": "true",
 			tabIndex: 0
 		});
 	},
@@ -712,6 +712,8 @@ return $.widget( "ui.tabs", {
 			.removeAttr( "role" )
 			.removeAttr( "tabIndex" )
 			.removeUniqueId();
+
+		this.tablist.unbind( this.eventNamespace );
 
 		this.tabs.add( this.panels ).each(function() {
 			if ( $.data( this, "ui-tabs-destroy" ) ) {

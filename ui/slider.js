@@ -83,7 +83,7 @@ return $.widget( "ui.slider", $.ui.mouse, {
 		var i, handleCount,
 			options = this.options,
 			existingHandles = this.element.find( ".ui-slider-handle" ).addClass( "ui-state-default ui-corner-all" ),
-			handle = "<a class='ui-slider-handle ui-state-default ui-corner-all' href='#'></a>",
+			handle = "<span class='ui-slider-handle ui-state-default ui-corner-all' tabindex='0'></span>",
 			handles = [];
 
 		handleCount = ( options.values && options.values.length ) || 1;
@@ -149,11 +149,10 @@ return $.widget( "ui.slider", $.ui.mouse, {
 	},
 
 	_setupEvents: function() {
-		var elements = this.handles.add( this.range ).filter( "a" );
-		this._off( elements );
-		this._on( elements, this._handleEvents );
-		this._hoverable( elements );
-		this._focusable( elements );
+		this._off( this.handles );
+		this._on( this.handles, this._handleEvents );
+		this._hoverable( this.handles );
+		this._focusable( this.handles );
 	},
 
 	_destroy: function() {
@@ -455,6 +454,9 @@ return $.widget( "ui.slider", $.ui.mouse, {
 					.removeClass( "ui-slider-horizontal ui-slider-vertical" )
 					.addClass( "ui-slider-" + this.orientation );
 				this._refreshValue();
+
+				// Reset positioning from previous orientation
+				this.handles.css( value === "horizontal" ? "bottom" : "left", "" );
 				break;
 			case "value":
 				this._animateOff = true;
@@ -672,9 +674,6 @@ return $.widget( "ui.slider", $.ui.mouse, {
 			}
 
 			this._slide( event, index, newVal );
-		},
-		click: function( event ) {
-			event.preventDefault();
 		},
 		keyup: function( event ) {
 			var index = $( event.target ).data( "ui-slider-handle-index" );

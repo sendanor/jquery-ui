@@ -287,17 +287,9 @@ $.widget("ui.resizable", $.ui.mouse, {
 
 		var curleft, curtop, cursor,
 			o = this.options,
-			iniPos = this.element.position(),
 			el = this.element;
 
 		this.resizing = true;
-
-		// Bugfix for http://bugs.jqueryui.com/ticket/1749
-		if ( (/absolute/).test( el.css("position") ) ) {
-			el.css({ position: "absolute", top: el.css("top"), left: el.css("left") });
-		} else if (el.is(".ui-draggable")) {
-			el.css({ position: "absolute", top: iniPos.top, left: iniPos.left });
-		}
 
 		this._renderProxy();
 
@@ -329,22 +321,14 @@ $.widget("ui.resizable", $.ui.mouse, {
 
 	_mouseDrag: function(event) {
 
-		var data,
-			el = this.helper, props = {},
+		var data, props,
 			smp = this.originalMousePosition,
 			a = this.axis,
 			dx = (event.pageX-smp.left)||0,
 			dy = (event.pageY-smp.top)||0,
 			trigger = this._change[a];
 
-		this.prevPosition = {
-			top: this.position.top,
-			left: this.position.left
-		};
-		this.prevSize = {
-			width: this.size.width,
-			height: this.size.height
-		};
+		this._updatePrevProperties();
 
 		if (!trigger) {
 			return false;
@@ -363,26 +347,16 @@ $.widget("ui.resizable", $.ui.mouse, {
 
 		this._propagate("resize", event);
 
-		if ( this.position.top !== this.prevPosition.top ) {
-			props.top = this.position.top + "px";
-		}
-		if ( this.position.left !== this.prevPosition.left ) {
-			props.left = this.position.left + "px";
-		}
-		if ( this.size.width !== this.prevSize.width ) {
-			props.width = this.size.width + "px";
-		}
-		if ( this.size.height !== this.prevSize.height ) {
-			props.height = this.size.height + "px";
-		}
-		el.css( props );
+		props = this._applyChanges();
 
 		if ( !this._helper && this._proportionallyResizeElements.length ) {
 			this._proportionallyResize();
 		}
 
 		if ( !$.isEmptyObject( props ) ) {
+			this._updatePrevProperties();
 			this._trigger( "resize", event, this.ui() );
+			this._applyChanges();
 		}
 
 		return false;
@@ -429,6 +403,38 @@ $.widget("ui.resizable", $.ui.mouse, {
 
 		return false;
 
+	},
+
+	_updatePrevProperties: function() {
+		this.prevPosition = {
+			top: this.position.top,
+			left: this.position.left
+		};
+		this.prevSize = {
+			width: this.size.width,
+			height: this.size.height
+		};
+	},
+
+	_applyChanges: function() {
+		var props = {};
+
+		if ( this.position.top !== this.prevPosition.top ) {
+			props.top = this.position.top + "px";
+		}
+		if ( this.position.left !== this.prevPosition.left ) {
+			props.left = this.position.left + "px";
+		}
+		if ( this.size.width !== this.prevSize.width ) {
+			props.width = this.size.width + "px";
+		}
+		if ( this.size.height !== this.prevSize.height ) {
+			props.height = this.size.height + "px";
+		}
+
+		this.helper.css( props );
+
+		return props;
 	},
 
 	_updateVirtualBoundaries: function(forceAspectRatio) {
@@ -549,32 +555,56 @@ $.widget("ui.resizable", $.ui.mouse, {
 		return data;
 	},
 
+	_getPaddingPlusBorderDimensions: function( element ) {
+		var i = 0,
+			widths = [],
+			borders = [
+				element.css( "borderTopWidth" ),
+				element.css( "borderRightWidth" ),
+				element.css( "borderBottomWidth" ),
+				element.css( "borderLeftWidth" )
+			],
+			paddings = [
+				element.css( "paddingTop" ),
+				element.css( "paddingRight" ),
+				element.css( "paddingBottom" ),
+				element.css( "paddingLeft" )
+			];
+
+		for ( ; i < 4; i++ ) {
+			widths[ i ] = ( parseInt( borders[ i ], 10 ) || 0 );
+			widths[ i ] += ( parseInt( paddings[ i ], 10 ) || 0 );
+		}
+
+		return {
+			height: widths[ 0 ] + widths[ 2 ],
+			width: widths[ 1 ] + widths[ 3 ]
+		};
+	},
+
 	_proportionallyResize: function() {
 
 		if (!this._proportionallyResizeElements.length) {
 			return;
 		}
 
-		var i, j, borders, paddings, prel,
+		var prel,
+			i = 0,
 			element = this.helper || this.element;
 
-		for ( i=0; i < this._proportionallyResizeElements.length; i++) {
+		for ( ; i < this._proportionallyResizeElements.length; i++) {
 
 			prel = this._proportionallyResizeElements[i];
 
-			if (!this.borderDif) {
-				this.borderDif = [];
-				borders = [prel.css("borderTopWidth"), prel.css("borderRightWidth"), prel.css("borderBottomWidth"), prel.css("borderLeftWidth")];
-				paddings = [prel.css("paddingTop"), prel.css("paddingRight"), prel.css("paddingBottom"), prel.css("paddingLeft")];
-
-				for ( j = 0; j < borders.length; j++ ) {
-					this.borderDif[ j ] = ( parseInt( borders[ j ], 10 ) || 0 ) + ( parseInt( paddings[ j ], 10 ) || 0 );
-				}
+			// TODO: Seems like a bug to cache this.outerDimensions
+			// considering that we are in a loop.
+			if (!this.outerDimensions) {
+				this.outerDimensions = this._getPaddingPlusBorderDimensions( prel );
 			}
 
 			prel.css({
-				height: (element.height() - this.borderDif[0] - this.borderDif[2]) || 0,
-				width: (element.width() - this.borderDif[1] - this.borderDif[3]) || 0
+				height: (element.height() - this.outerDimensions.height) || 0,
+				width: (element.width() - this.outerDimensions.width) || 0
 			});
 
 		}
@@ -653,9 +683,7 @@ $.widget("ui.resizable", $.ui.mouse, {
 			position: this.position,
 			size: this.size,
 			originalSize: this.originalSize,
-			originalPosition: this.originalPosition,
-			prevSize: this.prevSize,
-			prevPosition: this.prevPosition
+			originalPosition: this.originalPosition
 		};
 	}
 
@@ -769,7 +797,7 @@ $.ui.plugin.add( "resizable", "containment", {
 		}
 	},
 
-	resize: function( event, ui ) {
+	resize: function( event ) {
 		var woset, hoset, isParent, isOffsetRelative,
 			that = $( this ).resizable( "instance" ),
 			o = that.options,
@@ -805,18 +833,19 @@ $.ui.plugin.add( "resizable", "containment", {
 			that.position.top = that._helper ? co.top : 0;
 		}
 
-		that.offset.left = that.parentData.left + that.position.left;
-		that.offset.top = that.parentData.top + that.position.top;
-
-		woset = Math.abs( ( that._helper ? that.offset.left - cop.left : ( that.offset.left - co.left ) ) + that.sizeDiff.width );
-		hoset = Math.abs( ( that._helper ? that.offset.top - cop.top : ( that.offset.top - co.top ) ) + that.sizeDiff.height );
-
 		isParent = that.containerElement.get( 0 ) === that.element.parent().get( 0 );
 		isOffsetRelative = /relative|absolute/.test( that.containerElement.css( "position" ) );
 
 		if ( isParent && isOffsetRelative ) {
-			woset -= Math.abs( that.parentData.left );
+			that.offset.left = that.parentData.left + that.position.left;
+			that.offset.top = that.parentData.top + that.position.top;
+		} else {
+			that.offset.left = that.element.offset().left;
+			that.offset.top = that.element.offset().top;
 		}
+
+		woset = Math.abs( (that._helper ? that.offset.left - cop.left : (that.offset.left - co.left)) + that.sizeDiff.width );
+		hoset = Math.abs( (that._helper ? that.offset.top - cop.top : (that.offset.top - co.top)) + that.sizeDiff.height );
 
 		if ( woset + that.size.width >= that.parentData.width ) {
 			that.size.width = that.parentData.width - woset;
@@ -835,10 +864,10 @@ $.ui.plugin.add( "resizable", "containment", {
 		}
 
 		if ( !continueResize ){
-			that.position.left = ui.prevPosition.left;
-			that.position.top = ui.prevPosition.top;
-			that.size.width = ui.prevSize.width;
-			that.size.height = ui.prevSize.height;
+			that.position.left = that.prevPosition.left;
+			that.position.top = that.prevPosition.top;
+			that.size.width = that.prevSize.width;
+			that.size.height = that.prevSize.height;
 		}
 	},
 
@@ -967,7 +996,8 @@ $.ui.plugin.add("resizable", "ghost", {
 $.ui.plugin.add("resizable", "grid", {
 
 	resize: function() {
-		var that = $(this).resizable( "instance" ),
+		var outerDimensions,
+			that = $(this).resizable( "instance" ),
 			o = that.options,
 			cs = that.size,
 			os = that.originalSize,
@@ -988,16 +1018,16 @@ $.ui.plugin.add("resizable", "grid", {
 		o.grid = grid;
 
 		if (isMinWidth) {
-			newWidth = newWidth + gridX;
+			newWidth += gridX;
 		}
 		if (isMinHeight) {
-			newHeight = newHeight + gridY;
+			newHeight += gridY;
 		}
 		if (isMaxWidth) {
-			newWidth = newWidth - gridX;
+			newWidth -= gridX;
 		}
 		if (isMaxHeight) {
-			newHeight = newHeight - gridY;
+			newHeight -= gridY;
 		}
 
 		if (/^(se|s|e)$/.test(a)) {
@@ -1012,19 +1042,25 @@ $.ui.plugin.add("resizable", "grid", {
 			that.size.height = newHeight;
 			that.position.left = op.left - ox;
 		} else {
+			if ( newHeight - gridY <= 0 || newWidth - gridX <= 0) {
+				outerDimensions = that._getPaddingPlusBorderDimensions( this );
+			}
+
 			if ( newHeight - gridY > 0 ) {
 				that.size.height = newHeight;
 				that.position.top = op.top - oy;
 			} else {
-				that.size.height = gridY;
-				that.position.top = op.top + os.height - gridY;
+				newHeight = gridY - outerDimensions.height;
+				that.size.height = newHeight;
+				that.position.top = op.top + os.height - newHeight;
 			}
 			if ( newWidth - gridX > 0 ) {
 				that.size.width = newWidth;
 				that.position.left = op.left - ox;
 			} else {
-				that.size.width = gridX;
-				that.position.left = op.left + os.width - gridX;
+				newWidth = gridY - outerDimensions.height;
+				that.size.width = newWidth;
+				that.position.left = op.left + os.width - newWidth;
 			}
 		}
 	}
